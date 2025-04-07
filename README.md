@@ -1,7 +1,8 @@
 ![shellcheck](https://github.com/pmamico/java-ssl-tools/actions/workflows/shellcheck.yml/badge.svg)  
 
-# java-ssl-tools (`jssl`) 🔐
-
+# `jssl` 🔐
+Java SSL tools.  
+  
 Fix Java SSL issues in seconds – no more `PKIX path building failed`.  
 `jssl` lets you **ping**, **install**, and **uninstall** SSL certs directly in your Java keystore – _in one line_.
 
