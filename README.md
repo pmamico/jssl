@@ -41,7 +41,7 @@ Usage: jssl <host> <operation> [-p|--port <arg>] [-a|--alias <arg>] [-h|--help] 
 	-v, --version: Prints version
 ```
 
-## 🐳 Example: Using jssl in docker
+## 🐳 Using jssl in docker
 
 Here’s how you can use jssl inside a Dockerfile to import a certificate into the Java keystore during image build:
 
