@@ -1,4 +1,4 @@
-name: "Java 11"
+name: "Graalvm"
 on: [push, pull_request]
 
 jobs:
@@ -13,7 +13,7 @@ jobs:
       - name: Setup java
         uses: actions/setup-java@v4
         with:
-          distribution: '<distribution>'
+          distribution: 'graalvm'
           java-version: ${{ matrix.java }}
       - name: Run unit test
         run: sudo bash test.sh 2>&1
