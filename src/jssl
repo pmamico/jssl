@@ -1,5 +1,5 @@
 #!/bin/bash
-### java-ssl-tools (jssl) v2.0
+### jssl v2.0
 jssl_version="v2.0"
 JVM_VERSION=$(java -version 2>&1 | head -n 1)
 
