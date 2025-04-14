@@ -1,4 +1,4 @@
-![shellcheck](https://github.com/pmamico/java-ssl-tools/actions/workflows/shellcheck.yml/badge.svg)  
+![shellcheck](https://github.com/pmamico/jssl/actions/workflows/shellcheck.yml/badge.svg)  
 
 # `jssl` 🔐
 Java SSL tools.  
@@ -11,12 +11,12 @@ Fix Java SSL issues in seconds – no more `PKIX path building failed`.
 ✅ Docker & CI friendly  
 ✅ Autocompletion for Fish & Bash
 
-![demo](https://raw.githubusercontent.com/pmamico/java-ssl-tools/main/.doc/jssl.gif)
+![demo](https://raw.githubusercontent.com/pmamico/jssl/main/.doc/jssl.gif)
 
 ## 🚀 install
 any terminal:
 ```
-curl -sL https://raw.githubusercontent.com/pmamico/java-ssl-tools/main/install.sh | bash
+curl -sL https://raw.githubusercontent.com/pmamico/jssl/main/install.sh | bash
 ```
 on Windows, use `Git Bash` as system administrator.  
   
@@ -55,7 +55,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install jssl
-RUN curl -sL https://raw.githubusercontent.com/pmamico/java-ssl-tools/main/install.sh | bash
+RUN curl -sL https://raw.githubusercontent.com/pmamico/jssl/main/install.sh | bash
 
 # Set JAVA_HOME if not already set by base image
 ENV JAVA_HOME=/opt/java/openjdk

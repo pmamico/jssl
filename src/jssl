@@ -1,5 +1,5 @@
 #!/bin/bash
-### java-ssl-tools (jssl) v2.0
+### jssl v2.0
 jssl_version="v2.0"
 JVM_VERSION=$(java -version 2>&1 | head -n 1)
 
@@ -56,22 +56,20 @@ print_help()
   printf '%s\n' "${BOLD}jssl $jssl_version${RESET}"
 	printf '%s\n\n' "Install trusted certificate and check SSL handshake against java keystore."
 	# shellcheck disable=SC2059
-	printf "Usage: ${BOLD}jssl <host> <operation>${RESET} [-p|--port <arg>] [-a|--alias <arg>] [-h|--help] [-v|--version]\n"
-	printf '\t%s\n' "<host>: without https:// and port, eg. google.com"
-	printf '\t%s\n' "<operation>: ping, install or uninstall"
+  printf "Usage: ${BOLD}jssl <operation> [host] ${RESET} ...\n"
+	printf '\t%s\n' "<operation>: ping, install, file, list, uninstall"
+	printf '\t%s\n' "[host]: without https:// and port, eg. example.com"
 	printf '\t%s\n' "-p, --port: port (default: '443')"
-	printf '\t%s\n' "-a, --alias: alias in keystore (default: '<host>')"
-	printf '\t%s\n' "-l, --list: List installed certificates with jssl"
+	printf '\t%s\n' "-a, --alias: alias in keystore (default: '[host]')"
 	printf '\t%s\n' "-h, --help: Prints help"
 	printf '\t%s\n\n' "-v, --version: Prints version"
 
 	printf '%s\n' "${BOLD}Examples:${RESET}"
-	printf '%s\n' "jssl example.com install"
-	printf '%s\n\n' "jssl example.com ping"
+	printf '%s\n' "jssl install example.com"
+	printf '%s\n' "jssl ping example.com"
+	printf '%s\n\n' "jssl file hosts.txt"
 
-	printf '%s\n' "Current java:"
-	echo "$JVM_VERSION"
-	echo "JAVA_HOME=$JAVA_HOME"
+	check_java_home
 }
 
 print_version()
@@ -117,10 +115,6 @@ parse_commandline()
 				print_help
 				exit 0
 				;;
-			-l|--list)
-				list_installed_certs
-				exit 0
-				;;
 			-h*)
 				print_help
 				exit 0
@@ -139,19 +133,21 @@ parse_commandline()
 	done
 }
 
-handle_passed_args_count()
-{
-	local _required_args_string="'host' 'operation'"
-	test "${_positionals_count}" -ge 2 || _PRINT_HELP=yes die "Missing required arguments: $_required_args_string"
-	test "${_positionals_count}" -le 2 || _PRINT_HELP=yes die "Too many arguments provided"
-}
-
 assign_positional_args()
 {
-		shift "$1"
-		_arg_host="$1"
+    shift "$1"
+    _arg_operation="$1"
+
+		if [ "$_arg_operation" = "list" ]; then
+			test "${_positionals_count}" -ge 1 || _PRINT_HELP=no die "Missing required argument: 'operation'"
+			test "${_positionals_count}" -le 1 || _PRINT_HELP=no die "Too many arguments provided for 'list' operation"
+		else
+			test "${_positionals_count}" -ge 2 || _PRINT_HELP=no die "Missing required arguments: 'operation' and 'host'"
+			test "${_positionals_count}" -le 2 || _PRINT_HELP=no die "Too many arguments provided"
+		fi
+
 		shift
-		_arg_operation="$1"
+		_arg_host="$1"
 }
 
 print_and_compile_java()
@@ -279,6 +275,56 @@ install_cert()
   rm -f "$_arg_alias".pem
 }
 
+run_batch_file() {
+  local filename="$1"
+
+  if [[ ! -f "$filename" ]]; then
+    echo "${RED}✖ File not found: $filename${RESET}"
+    exit 1
+  fi
+
+  while IFS= read -r line || [ -n "$line" ]; do
+    host=$(echo "$line" | xargs)  # Trim whitespace
+    if [[ -n "$host" ]]; then
+      echo "${YELLOW}--- Processing $host ---${RESET}"
+      _arg_host="$host"
+      install_cert
+      check_handshake
+      echo
+    fi
+  done < "$filename"
+}
+
+print_warning() {
+    echo -e "\033[33m[WARNING]\033[0m $1"
+}
+
+get_real_javac_version() {
+    "$1/bin/javac" --version 2>/dev/null | awk '{print $2}'
+}
+
+get_path_javac_version() {
+    javac --version 2>/dev/null | awk '{print $2}'
+}
+
+check_java_home() {
+    if [ -z "$JAVA_HOME" ]; then
+        print_warning "JAVA_HOME is not set."
+
+    else
+      echo "JAVA_HOME: $JAVA_HOME"
+    fi
+
+    if [ -n "$JAVA_HOME" ]; then
+        path_version=$(get_path_javac_version)
+        home_version=$(get_real_javac_version "$JAVA_HOME")
+
+        if [ "$path_version" != "$home_version" ]; then
+            print_warning "javac version ($path_version) differs from JAVA_HOME/bin/javac version ($home_version)."
+        fi
+    fi
+}
+
 ###################
 # Part: uninstall #
 ###################
@@ -313,7 +359,6 @@ uninstall_cert()
 ################################################
 
 parse_commandline "$@"
-handle_passed_args_count
 assign_positional_args 1 "${_positionals[@]}"
 
 if [ "$_arg_operation" == "ping" ]; then
@@ -322,6 +367,10 @@ elif [ "$_arg_operation" == "install" ]; then
   install_cert
 elif [ "$_arg_operation" == "uninstall" ]; then
   uninstall_cert
+elif [ "$_arg_operation" == "list" ]; then
+  list_installed_certs
+elif [ "$_arg_operation" == "file" ]; then
+  run_batch_file "$_arg_host"
 else
-  die "Unknown operation: $_arg_operation! Valid operations: ping, install, uninstall"
+  die "Unknown operation: $_arg_operation! Valid operations: ping, install, uninstall, list, file"
 fi
