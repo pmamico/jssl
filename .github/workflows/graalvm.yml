@@ -10,6 +10,8 @@ jobs:
     name: Java ${{ matrix.Java }} sample
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - name: Setup java
         uses: actions/setup-java@v4
         with:
