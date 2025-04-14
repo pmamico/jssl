@@ -1,22 +1,19 @@
-![shellcheck](https://github.com/pmamico/jssl/actions/workflows/shellcheck.yml/badge.svg)  
+![shellcheck](https://github.com/pmamico/java-ssl-tools/actions/workflows/shellcheck.yml/badge.svg)  
 
 # `jssl` 🔐
-Java SSL tools.  
-  
 Fix Java SSL issues in seconds – no more `PKIX path building failed`.  
 `jssl` lets you **ping**, **install**, and **uninstall** SSL certs directly in your Java keystore – _in one line_.
 
 ✅ No more manual `keytool` troubles   
-✅ Works with any JVM (Java 8–24)  
-✅ Docker & CI friendly  
-✅ Autocompletion for Fish & Bash
+✅ Works with any Java (8–24)  
+✅ Docker & CI friendly
 
-![demo](https://raw.githubusercontent.com/pmamico/jssl/main/.doc/jssl.gif)
+![demo](https://raw.githubusercontent.com/pmamico/java-ssl-tools/main/.doc/jssl.gif)
 
 ## 🚀 install
 any terminal:
 ```
-curl -sL https://raw.githubusercontent.com/pmamico/jssl/main/install.sh | bash
+curl -sL https://raw.githubusercontent.com/pmamico/java-ssl-tools/main/install.sh | bash
 ```
 on Windows, use `Git Bash` as system administrator.  
   
@@ -31,12 +28,11 @@ brew install pmamico/java/jssl
 jssl v2.0
 Install trusted certificate and check SSL handshake against java keystore.
 
-Usage: jssl <host> <operation> [-p|--port <arg>] [-a|--alias <arg>] [-h|--help] [-v|--version]
-	<host>: without https:// and port, eg. google.com
-	<operation>: ping, install or uninstall
+Usage: jssl <operation> [host|file] ...
+	[host]: without https:// and port, eg. google.com
+	<operation>: ping, install, uninstall, list, file
 	-p, --port: port (default: '443')
 	-a, --alias: alias in keystore (default: '<host>')
-	-l, --list: List installed certificates with jssl
 	-h, --help: Prints help
 	-v, --version: Prints version
 ```
@@ -55,7 +51,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install jssl
-RUN curl -sL https://raw.githubusercontent.com/pmamico/jssl/main/install.sh | bash
+RUN curl -sL https://raw.githubusercontent.com/pmamico/java-ssl-tools/main/install.sh | bash
 
 # Set JAVA_HOME if not already set by base image
 ENV JAVA_HOME=/opt/java/openjdk
@@ -81,27 +77,6 @@ services:
              java -jar /app.jar"
 ```
 
-## 🐟 Fish shell autocomplete 
-
-You can install the Fish shell autocomplete by copying `autocomplete/jssl.fish` to `~/.config/fish/completions`:
-```sh
-cp autocomplete/jssl.fish ~/.config/fish/completions/jssl.fish
-source ~/.config/fish/completions/jssl.fish
-```
-
-## 🐚 Bash completion
-
-You can install the Bash completion by copying `autocomplete/jssl` to `/etc/bash_completion.d`:
-
-```sh
-cp autocomplete/jssl /etc/bash_completion.d/jssl
-source /etc/bash_completion.d/jssl
-```
-
-```dockerfile
-
-```
-
 ## Why not just use `keytool`?
 Java has a built-in `keytool` to handle certificates on the java keystore.  
 However it has a few drawbacks:
@@ -124,10 +99,10 @@ is equivalent to
 $ jssl <URL> install
 ```
 
-## Compatibilty
+## Compatibility
 
-![openjdk](https://github.com/pmamico/jssl/actions/workflows/openjdk.yml/badge.svg)  
-![graalvm](https://github.com/pmamico/jssl/actions/workflows/graalvm.yml/badge.svg)  
+![OpenJDK](https://github.com/pmamico/jssl/actions/workflows/openjdk.yml/badge.svg)
+![GraalVM](https://github.com/pmamico/jssl/actions/workflows/graalvm.yml/badge.svg)
 
 ## Requirements
 
