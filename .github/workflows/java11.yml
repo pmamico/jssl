@@ -18,4 +18,4 @@ jobs:
           java-version: '11'
 
       - name: Run unit test
-        run: bash test.sh 2>&1
+        run: sudo bash test.sh 2>&1
