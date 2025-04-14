@@ -135,8 +135,6 @@ parse_commandline()
 
 assign_positional_args()
 {
-    test "${_positionals_count}" -ge 1 || _PRINT_HELP=yes die ""
-
     shift "$1"
     _arg_operation="$1"
 
