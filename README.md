@@ -124,13 +124,10 @@ is equivalent to
 $ jssl <URL> install
 ```
 
-## Supports
+## Compatibilty
 
-|         | Java 1.8           | Java 11            | Java 17            | Java 21            |
-|---------|--------------------|--------------------|--------------------|--------------------|
-| Linux   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
-| MacOS   | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
-| Windows | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+![openjdk](https://github.com/pmamico/jssl/actions/workflows/openjdk.yml/badge.svg)  
+![graalvm](https://github.com/pmamico/jssl/actions/workflows/graalvm.yml/badge.svg)  
 
 ## Requirements
 
