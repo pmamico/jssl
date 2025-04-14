@@ -10,7 +10,6 @@ load 'test_helper/bats-assert/load'
 }
 
 @test "jssl install example.com" {
-    ./src/jssl uninstall example.com || true
     run ./src/jssl install example.com
     assert_success
     assert_output --partial "Certificate installed"
