@@ -151,16 +151,19 @@ assign_positional_args()
     shift "$1"
     _arg_operation="$1"
 
-		if [ "$_arg_operation" = "list" ]; then
-			test "${_positionals_count}" -ge 1 || _PRINT_HELP=no die "Missing required argument: 'operation'"
-			test "${_positionals_count}" -le 1 || _PRINT_HELP=no die "Too many arguments provided for 'list' operation"
-		else
-			test "${_positionals_count}" -ge 2 || _PRINT_HELP=no die "Missing required arguments: 'operation' and 'host'"
-			test "${_positionals_count}" -le 2 || _PRINT_HELP=no die "Too many arguments provided"
-		fi
-
-		shift
-		_arg_host="$1"
+    if [ "$_arg_operation" = "doctor" ]; then
+        _arg_host=""
+        return
+    elif [ "$_arg_operation" = "list" ]; then
+        test "${_positionals_count}" -ge 1 || _PRINT_HELP=no die "Missing required argument: 'operation'"
+        test "${_positionals_count}" -le 1 || _PRINT_HELP=no die "Too many arguments provided for 'list' operation"
+        _arg_host=""
+    else
+        test "${_positionals_count}" -ge 2 || _PRINT_HELP=no die "Missing required arguments: 'operation' and 'host'"
+        test "${_positionals_count}" -le 2 || _PRINT_HELP=no die "Too many arguments provided"
+        shift
+        _arg_host="$1"
+    fi
 }
 
 print_and_compile_java()
@@ -225,6 +228,51 @@ check_handshake()
   clean_up_sslping
 }
 
+#################
+# Part: doctor  #
+#################
+run_doctor() {
+  echo "${YELLOW}➤ Running jssl doctor...${RESET}" >&2
+
+  pkix_hosts=()
+  capture_next_line=false
+
+  while IFS= read -r line; do
+    echo "$line" # továbbítja a kimenetet a terminál felé is
+
+    if [[ "$line" == *"PKIX path building failed"* ]]; then
+      capture_next_line=true
+      continue
+    fi
+
+    if $capture_next_line; then
+      # keresünk benne egy host-ot (akár URL részeként is)
+      if [[ "$line" =~ https?://([^/:]+) ]]; then
+        host="${BASH_REMATCH[1]}"
+        pkix_hosts+=("$host")
+      fi
+      capture_next_line=false
+    fi
+  done
+
+  # Szűrés duplikátumokra
+  unique_hosts=($(printf "%s\n" "${pkix_hosts[@]}" | sort -u))
+
+  if [ "${#unique_hosts[@]}" -eq 0 ]; then
+    echo "${GREEN}✔ No PKIX issues found.${RESET}" >&2
+    return
+  fi
+
+  for host in "${unique_hosts[@]}"; do
+    echo "${BLUE}➤ Found PKIX error with host: $host${RESET}" >&2
+    echo "${YELLOW}→ Installing cert: jssl install $host${RESET}" >&2
+    jssl install "$host"
+    echo "${YELLOW}→ Verifying connection: jssl ping $host${RESET}" >&2
+    jssl ping "$host"
+    echo >&2
+  done
+}
+
 ################
 # Part: list   #
 ################
@@ -270,12 +318,12 @@ install_cert()
       -alias "$_arg_alias" \
       -file "$_arg_alias".pem \
       -keystore "$JAVA_HOME"/jre/lib/security/cacerts \
-      -keypass changeit -storepass changeit
+      -keypass changeit -storepass changeit | debug
   else
     "$JAVA_HOME/bin/keytool" -importcert -cacerts -noprompt \
       -alias "$_arg_alias" \
       -file "$_arg_alias".pem \
-      -keypass changeit -storepass changeit
+      -keypass changeit -storepass changeit | debug
   fi
 
   # shellcheck disable=SC2181
@@ -384,6 +432,8 @@ elif [ "$_arg_operation" == "list" ]; then
   list_installed_certs
 elif [ "$_arg_operation" == "file" ]; then
   run_batch_file "$_arg_host"
+elif [ "$_arg_operation" == "doctor" ]; then
+  run_doctor
 elif [ "$_arg_operation" == "version" ]; then
   print_version
 else
