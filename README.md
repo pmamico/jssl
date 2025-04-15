@@ -2,15 +2,11 @@
 
 # `jssl` 🔐
 Fix Java SSL issues in seconds – no more `PKIX path building failed`.  
-`jssl` lets you **ping** and **install** SSL certs directly in your Java keystore – _in one line_.
-
-✅ No more manual `keytool` troubles   
-✅ Works with any Java (8–24)  
-✅ Docker & CI friendly
+`jssl` lets you **ping** and **install** SSL certs directly in your Java keystore.
 
 ![demo](https://raw.githubusercontent.com/pmamico/java-ssl-tools/main/.doc/jssl.gif)
 
-## 🚀 install
+## 🚀 Install
 any terminal:
 ```
 curl -sL https://raw.githubusercontent.com/pmamico/java-ssl-tools/main/install.sh | bash
@@ -25,17 +21,21 @@ brew install pmamico/java/jssl
 
 ## Manual
 ```
-jssl v2.0
-Install trusted certificate and check SSL handshake against java keystore.
-
-Usage: jssl <operation> [host|file] ...
-	[host]: without https:// and port, eg. google.com
-	<operation>: ping, install, uninstall, list, file
-	-p, --port: port (default: '443')
-	-a, --alias: alias in keystore (default: '<host>')
-	-h, --help: Prints help
-	-v, --version: Prints version
+jssl <operation> [host|file] [options]
 ```
+**Operations**  
+- **ping**  
+Check the SSL handshake against a host without modifying the keystore.  
+- **install**  
+Connect to a host, retrieve its SSL certificate, and install it into the Java keystore.  
+- **file**  
+Process a file containing a list of hosts (one per line) to ping or install certificates.  
+- **list**  
+List trusted certificates currently present in the Java keystore installed with jssl.  
+- **uninstall**  
+Remove a certificate from the Java keystore, identified by its alias.  
+- **doctor**  
+Read Maven or Gradle build logs (from stdin) and automatically detect and install missing certificates based on connection errors.  
 
 ## 🐳 Using jssl in docker
 

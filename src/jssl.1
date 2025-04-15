@@ -1,0 +1,99 @@
+.\" Manpage for jssl
+.TH JSSL 1 "April 2025" "Version 2.2" "Java SSL Utility"
+
+.SH NAME
+jssl \- Java keystore certificate installer and SSL diagnostic tool
+
+.SH SYNOPSIS
+.B jssl
+<operation> [host|file] [options]
+
+.SH DESCRIPTION
+.B jssl
+is a command-line tool to manage and validate SSL certificates in Java keystores.
+It can install certificates, check SSL handshakes, process host files, and analyze logs from Maven or Gradle to install missing certificates.
+
+.SH OPERATIONS
+.TP
+.B ping
+Check the SSL handshake against a host without modifying the keystore.
+
+.TP
+.B install
+Connect to a host, retrieve its SSL certificate, and install it into the Java keystore.
+
+.TP
+.B file
+Process a file containing a list of hosts (one per line) to ping or install certificates.
+
+.TP
+.B list
+List trusted certificates currently present in the Java keystore installed with jssl.
+
+.TP
+.B uninstall
+Remove a certificate from the Java keystore, identified by its alias.
+
+.TP
+.B doctor
+Read Maven or Gradle build logs (from stdin) and automatically detect and install missing certificates based on connection errors.
+
+.SH OPTIONS
+.TP
+.B \-p, \-\-port <port>
+Specify the port number to connect to (default: 443).
+
+.TP
+.B \-a, \-\-alias <alias>
+Specify the alias under which the certificate will be stored in the keystore (default: jssl_[host]).
+
+.TP
+.B \-v, \-\-verbose
+Verbose logging.
+
+.TP
+.B \-\-version
+Print version information and exit.
+
+.TP
+.B \-h, \-\-help
+Print this help message and exit.
+
+.SH USAGE EXAMPLES
+.TP
+Install the certificate from a single host:
+.B
+jssl install example.com
+
+.TP
+Ping an SSL server and check the handshake:
+.B
+jssl ping example.com
+
+.TP
+Install certificates from multiple hosts listed in a file:
+.B
+jssl file hosts.txt
+
+.TP
+Use Maven and auto-install any missing certificates:
+.B
+mvn package | jssl doctor
+
+.SH ENVIRONMENT
+.TP
+.B JAVA_HOME
+The Java installation directory is detected from JAVA_HOME.
+If not set, the system default is used.
+
+Example:
+JAVA_HOME=/opt/homebrew/Cellar/openjdk@21/21.0.5/libexec/openjdk.jdk/Contents/Home
+
+.SH VERSION
+v2.2
+
+.SH AUTHOR
+Mico Papp <papp.mico@gmail.com>
+
+.SH LICENSE
+MIT License
