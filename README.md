@@ -4,7 +4,7 @@
 Fix Java SSL issues in seconds – no more `PKIX path building failed`.  
 `jssl` lets you **ping** and **install** SSL certs directly in your Java keystore.
 
-![demo](https://raw.githubusercontent.com/pmamico/java-ssl-tools/main/.doc/jssl.gif)
+![demo](https://raw.githubusercontent.com/pmamico/java-ssl-tools/main/.doc/jssl.gif) 
 
 ## 🚀 Install
 any terminal:

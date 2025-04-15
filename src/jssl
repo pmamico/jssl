@@ -232,13 +232,13 @@ check_handshake()
 # Part: doctor  #
 #################
 run_doctor() {
-  echo "${YELLOW}➤ Running jssl doctor...${RESET}" >&2
+  echo "${BLUE}➤ Running jssl doctor...${RESET}" >&2
 
   pkix_hosts=()
   capture_next_line=false
 
   while IFS= read -r line; do
-    echo "$line" # továbbítja a kimenetet a terminál felé is
+    debug "$line"
 
     if [[ "$line" == *"PKIX path building failed"* ]]; then
       capture_next_line=true
@@ -246,7 +246,6 @@ run_doctor() {
     fi
 
     if $capture_next_line; then
-      # keresünk benne egy host-ot (akár URL részeként is)
       if [[ "$line" =~ https?://([^/:]+) ]]; then
         host="${BASH_REMATCH[1]}"
         pkix_hosts+=("$host")
@@ -255,7 +254,6 @@ run_doctor() {
     fi
   done
 
-  # Szűrés duplikátumokra
   unique_hosts=($(printf "%s\n" "${pkix_hosts[@]}" | sort -u))
 
   if [ "${#unique_hosts[@]}" -eq 0 ]; then
@@ -265,9 +263,9 @@ run_doctor() {
 
   for host in "${unique_hosts[@]}"; do
     echo "${BLUE}➤ Found PKIX error with host: $host${RESET}" >&2
-    echo "${YELLOW}→ Installing cert: jssl install $host${RESET}" >&2
+    echo "${BLUE}→ Installing cert: jssl install $host${RESET}" >&2
     jssl install "$host"
-    echo "${YELLOW}→ Verifying connection: jssl ping $host${RESET}" >&2
+    echo "${BLUE}→ Verifying connection: jssl ping $host${RESET}" >&2
     jssl ping "$host"
     echo >&2
   done
@@ -302,7 +300,7 @@ install_cert()
   fi
 
   debug "${BLUE}Installing cert for $JVM_VERSION${RESET}"
-  debug "keytool: ${YELLOW}$JAVA_HOME/bin/keytool${RESET}"
+  debug "keytool: ${BLUE}$JAVA_HOME/bin/keytool${RESET}"
 
   echo | openssl s_client -connect "$_arg_host:$_arg_port" 2>/dev/null | openssl x509 > "$_arg_alias".pem
   # shellcheck disable=SC2181
@@ -347,7 +345,7 @@ run_batch_file() {
   while IFS= read -r line || [ -n "$line" ]; do
     host=$(echo "$line" | xargs)  # Trim whitespace
     if [[ -n "$host" ]]; then
-      debug "${YELLOW}--- Processing $host ---${RESET}"
+      debug "${BLUE}--- Processing $host ---${RESET}"
       _arg_host="$host"
       install_cert
       check_handshake
@@ -396,7 +394,7 @@ uninstall_cert()
   fi
 
   debug "${BLUE}Uninstalling certificate: jssl_$_arg_alias${RESET}"
-  debug "keytool: ${YELLOW}$JAVA_HOME/bin/keytool${RESET}"
+  debug "keytool: ${BLUE}$JAVA_HOME/bin/keytool${RESET}"
 
   if [[ $JVM_VERSION == *"1.8"* ]]; then
     "$JAVA_HOME/bin/keytool" -delete \
