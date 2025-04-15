@@ -1,6 +1,6 @@
 #!/bin/bash
-### jssl v2.0
-jssl_version="v2.1"
+### jssl v2.2
+jssl_version="v2.2"
 JVM_VERSION=$(java -version 2>&1 | head -n 1)
 
 ###############################
@@ -38,6 +38,13 @@ begins_with_short_option()
 	test "$all_short_options" = "${all_short_options/$first_option/}" && return 1 || return 0
 }
 
+debug()
+{
+  if [ "$_verbose" = "true" ]; then
+    echo "$@" >&2
+  fi
+}
+
 #################################
 # Part: DEFAULTS INITIALIZATION #
 #################################
@@ -46,6 +53,7 @@ _positionals=()
 _arg_port="443"
 _arg_alias="<host>"
 _arg_operation="ping"
+_verbose=""
 
 #############################
 # Part: options without arg #
@@ -56,18 +64,21 @@ print_help()
   printf '%s\n' "${BOLD}jssl $jssl_version${RESET}"
 	printf '%s\n\n' "Install trusted certificate and check SSL handshake against java keystore."
 	# shellcheck disable=SC2059
-  printf "Usage: ${BOLD}jssl <operation> [host] ${RESET} ...\n"
-	printf '\t%s\n' "<operation>: ping, install, file, list, uninstall"
-	printf '\t%s\n' "[host]: without https:// and port, eg. example.com"
+  printf "Usage: ${BOLD}jssl <operation> [host|file] ${RESET} ...\n"
+	printf '\t%s\n' "<operation>: ping, install, file, list, uninstall, doctor"
+	printf '\t%s\n' "[host|file]: host without https:// and port, eg. example.com or a file containing hosts"
 	printf '\t%s\n' "-p, --port: port (default: '443')"
-	printf '\t%s\n' "-a, --alias: alias in keystore (default: '[host]')"
+	printf '\t%s\n' "-a, --alias: alias in keystore (default: 'jssl_[host]')"
+	  printf '\t%s\n\n' "-v, --verbose: Prints version"
+  printf '\t%s\n\n' "--version: Prints version"
 	printf '\t%s\n' "-h, --help: Prints help"
-	printf '\t%s\n\n' "-v, --version: Prints version"
+
 
 	printf '%s\n' "${BOLD}Examples:${RESET}"
 	printf '%s\n' "jssl install example.com"
 	printf '%s\n' "jssl ping example.com"
 	printf '%s\n\n' "jssl file hosts.txt"
+  printf '%s\n\n' "mvn pacakge | jssl doctor"
 
 	check_java_home
 }
@@ -119,10 +130,13 @@ parse_commandline()
 				print_help
 				exit 0
 				;;
-			-v|--version)
+			--version)
 				print_version
 				exit 0
 				;;
+      -v|--verbose)
+        _verbose="true"
+        ;;
 			*)
 				_last_positional="$1"
 				_positionals+=("$_last_positional")
@@ -138,16 +152,19 @@ assign_positional_args()
     shift "$1"
     _arg_operation="$1"
 
-		if [ "$_arg_operation" = "list" ]; then
-			test "${_positionals_count}" -ge 1 || _PRINT_HELP=no die "Missing required argument: 'operation'"
-			test "${_positionals_count}" -le 1 || _PRINT_HELP=no die "Too many arguments provided for 'list' operation"
-		else
-			test "${_positionals_count}" -ge 2 || _PRINT_HELP=no die "Missing required arguments: 'operation' and 'host'"
-			test "${_positionals_count}" -le 2 || _PRINT_HELP=no die "Too many arguments provided"
-		fi
-
-		shift
-		_arg_host="$1"
+    if [ "$_arg_operation" = "doctor" ]; then
+        _arg_host=""
+        return
+    elif [ "$_arg_operation" = "list" ]; then
+        test "${_positionals_count}" -ge 1 || _PRINT_HELP=no die "Missing required argument: 'operation'"
+        test "${_positionals_count}" -le 1 || _PRINT_HELP=no die "Too many arguments provided for 'list' operation"
+        _arg_host=""
+    else
+        test "${_positionals_count}" -ge 2 || _PRINT_HELP=no die "Missing required arguments: 'operation' and 'host'"
+        test "${_positionals_count}" -le 2 || _PRINT_HELP=no die "Too many arguments provided"
+        shift
+        _arg_host="$1"
+    fi
 }
 
 print_and_compile_java()
@@ -180,7 +197,7 @@ public class SSLPing {
 				System.out.print(in.read());
 			}
 		} catch (Exception exception) {
-			exception.printStackTrace();
+			System.err.println(exception);
 			System.exit(1);
 		}
 	}
@@ -199,8 +216,8 @@ clean_up_sslping()
 ################
 check_handshake()
 {
-  echo "${BLUE}Checking SSL handshake...${RESET}"
-  "$JAVA_HOME/bin/javac" -version
+  debug "${BLUE}Checking SSL handshake...${RESET}"
+  "$JAVA_HOME/bin/javac" -version | debug
   print_and_compile_java
   "$JAVA_HOME/bin/java" SSLPing "$_arg_host" "$_arg_port"
   # shellcheck disable=SC2181
@@ -212,12 +229,54 @@ check_handshake()
   clean_up_sslping
 }
 
+#################
+# Part: doctor  #
+#################
+run_doctor() {
+  echo "${BLUE}➤ Running jssl doctor...${RESET}" >&2
+
+  pkix_hosts=()
+  capture_next_line=false
+
+  while IFS= read -r line; do
+    debug "$line"
+
+    if [[ "$line" == *"PKIX path building failed"* ]]; then
+      capture_next_line=true
+    fi
+
+    if $capture_next_line; then
+      if [[ "$line" =~ https?://([^/:]+) ]]; then
+        host="${BASH_REMATCH[1]}"
+        pkix_hosts+=("$host")
+      fi
+      capture_next_line=false
+    fi
+  done
+
+  unique_hosts=($(printf "%s\n" "${pkix_hosts[@]}" | sort -u))
+
+  if [ "${#unique_hosts[@]}" -eq 0 ]; then
+    echo "${GREEN}✔ No PKIX issues found.${RESET}" >&2
+    return
+  fi
+
+  for host in "${unique_hosts[@]}"; do
+    echo "${BLUE}➤ Found PKIX error with host: $host${RESET}" >&2
+    echo "${BLUE}→ Installing cert: jssl install $host${RESET}" >&2
+    jssl install "$host"
+    echo "${BLUE}→ Verifying connection: jssl ping $host${RESET}" >&2
+    jssl ping "$host"
+    echo >&2
+  done
+}
+
 ################
 # Part: list   #
 ################
 list_installed_certs()
 {
-  echo "${BLUE}Listing installed jssl certificates in keystore...${RESET}"
+  debug "${BLUE}Listing installed jssl certificates in keystore...${RESET}"
   if [[ $JVM_VERSION == *"1.8"* ]]; then
     "$JAVA_HOME/bin/keytool" -v --list \
       -keystore "$JAVA_HOME"/jre/lib/security/cacerts \
@@ -240,8 +299,8 @@ install_cert()
     _arg_alias="jssl_$_arg_host"
   fi
 
-  echo "${BLUE}Installing cert for $JVM_VERSION${RESET}"
-  echo "keytool: ${YELLOW}$JAVA_HOME/bin/keytool${RESET}"
+  debug "${BLUE}Installing cert for $JVM_VERSION${RESET}"
+  debug "keytool: ${BLUE}$JAVA_HOME/bin/keytool${RESET}"
 
   echo | openssl s_client -connect "$_arg_host:$_arg_port" 2>/dev/null | openssl x509 > "$_arg_alias".pem
   # shellcheck disable=SC2181
@@ -257,12 +316,12 @@ install_cert()
       -alias "$_arg_alias" \
       -file "$_arg_alias".pem \
       -keystore "$JAVA_HOME"/jre/lib/security/cacerts \
-      -keypass changeit -storepass changeit
+      -keypass changeit -storepass changeit | debug
   else
     "$JAVA_HOME/bin/keytool" -importcert -cacerts -noprompt \
       -alias "$_arg_alias" \
       -file "$_arg_alias".pem \
-      -keypass changeit -storepass changeit
+      -keypass changeit -storepass changeit | debug
   fi
 
   # shellcheck disable=SC2181
@@ -286,7 +345,7 @@ run_batch_file() {
   while IFS= read -r line || [ -n "$line" ]; do
     host=$(echo "$line" | xargs)  # Trim whitespace
     if [[ -n "$host" ]]; then
-      echo "${YELLOW}--- Processing $host ---${RESET}"
+      debug "${BLUE}--- Processing $host ---${RESET}"
       _arg_host="$host"
       install_cert
       check_handshake
@@ -334,8 +393,8 @@ uninstall_cert()
     _arg_alias="$_arg_host"
   fi
 
-  echo "${BLUE}Uninstalling certificate: jssl_$_arg_alias${RESET}"
-  echo "keytool: ${YELLOW}$JAVA_HOME/bin/keytool${RESET}"
+  debug "${BLUE}Uninstalling certificate: jssl_$_arg_alias${RESET}"
+  debug "keytool: ${BLUE}$JAVA_HOME/bin/keytool${RESET}"
 
   if [[ $JVM_VERSION == *"1.8"* ]]; then
     "$JAVA_HOME/bin/keytool" -delete \
@@ -371,6 +430,10 @@ elif [ "$_arg_operation" == "list" ]; then
   list_installed_certs
 elif [ "$_arg_operation" == "file" ]; then
   run_batch_file "$_arg_host"
+elif [ "$_arg_operation" == "doctor" ]; then
+  run_doctor
+elif [ "$_arg_operation" == "version" ]; then
+  print_version
 else
-  die "Unknown operation: $_arg_operation! Valid operations: ping, install, uninstall, list, file"
+  die "Unknown operation: $_arg_operation! Valid operations: ping, install, uninstall, list, file, version, doctor"
 fi
