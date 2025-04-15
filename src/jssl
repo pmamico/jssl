@@ -3,6 +3,25 @@
 jssl_version="v2.2"
 JVM_VERSION=$(java -version 2>&1 | head -n 1)
 
+
+STATE_FILE="$HOME/.state"
+
+# Ha nincs állapot, alapértelmezett érték
+if [ ! -f "$STATE_FILE" ]; then
+  echo "FAIL" > "$STATE_FILE"
+fi
+
+# Állapot beolvasása
+STATE=$(cat "$STATE_FILE")
+if [[ "$STATE" == "DOCTOR" ]]; then
+  while IFS= read -r line; do
+    echo "$line"
+  done
+  exit 0
+fi
+
+
+
 ###############################
 ### Part: UX ###
 ###############################

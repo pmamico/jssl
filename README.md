@@ -47,11 +47,8 @@ brew install pmamico/java/jssl
 ```
 
 ## DEMO
-**Standard usage:**  
-![demo](https://raw.githubusercontent.com/pmamico/java-ssl-tools/main/.doc/jssl.gif)  
 
-**Automatic fix with `doctor`:**  
-![doctor](https://raw.githubusercontent.com/pmamico/java-ssl-tools/main/.doc/doctor.gif)  
+![demo](https://raw.githubusercontent.com/pmamico/java-ssl-tools/main/.doc/jssl.gif)
 
 ## COMPATIBILITY
 ![OpenJDK](https://github.com/pmamico/jssl/actions/workflows/openjdk.yml/badge.svg)
