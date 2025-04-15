@@ -3,7 +3,7 @@
 ![shellcheck](https://github.com/pmamico/java-ssl-tools/actions/workflows/shellcheck.yml/badge.svg)
 
 ## NAME
-**jssl** \- Resolve Java SSL issues instantly. No more `PKIX path building failed`.  
+**jssl** \- Resolve Java SSL issues like `PKIX path building failed` instantly.  
 Diagnose, retrieve, and install certificates into Java keystores with ease.
 
 ## SYNOPSIS
