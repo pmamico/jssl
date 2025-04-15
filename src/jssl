@@ -78,6 +78,7 @@ print_help()
 	printf '%s\n' "jssl install example.com"
 	printf '%s\n' "jssl ping example.com"
 	printf '%s\n\n' "jssl file hosts.txt"
+  printf '%s\n\n' "mvn pacakge | jssl doctor"
 
 	check_java_home
 }
@@ -242,7 +243,6 @@ run_doctor() {
 
     if [[ "$line" == *"PKIX path building failed"* ]]; then
       capture_next_line=true
-      continue
     fi
 
     if $capture_next_line; then

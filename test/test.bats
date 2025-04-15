@@ -52,6 +52,18 @@ load 'test_helper/bats-assert/load'
     assert_output --partial "SSL handshake successful with howsmyssl.com:443"
 }
 
+@test "success | jssl doctor" {
+    run bash -c "echo 'SUCCESS' | ./src/jssl doctor"
+    assert_success
+    assert_output --partial "No PKIX issues found"
+}
+
+@test "failing command | jssl doctor" {
+    run bash -c "echo '(https://secured.com/repository/internal/): PKIX path building failed' | ./src/jssl doctor"
+    assert_success
+    assert_output --partial "jssl install secured.com"
+}
+
 @test "warns when JAVA_HOME is not set" {
     unset JAVA_HOME
     run ./src/jssl --help
