@@ -23,13 +23,13 @@ jssl <operation> [host|file] [options]
 :   Connect to a host, retrieve its SSL certificate, and install it into the Java keystore.
 
 **file**
-:   Process a file containing a list of hosts (one per line) to ping or install certificates.
+:   Process a file containing a list of hosts (one per line) to install certificates.
 
 **list**
 :   List trusted certificates currently present in the Java keystore installed with jssl.
 
 **uninstall**
-:   Remove a certificate from the Java keystore, identified by its alias.
+:   Remove a certificate from the Java keystore, identified by its hostname or alias.
 
 **doctor**
 :   Read Maven build logs (from stdin) and automatically detect and install missing certificates based on connection errors.
@@ -43,7 +43,7 @@ Run in any terminal. On Windows, use **Git Bash** with administrative privileges
 
 ### Via Homebrew
 ```bash
-brew install pmamico/java/jssl
+brew install pmamico/keg/jssl
 ```
 
 ## DEMO
