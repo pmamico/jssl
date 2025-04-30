@@ -4,24 +4,6 @@ jssl_version="v2.2"
 JVM_VERSION=$(java -version 2>&1 | head -n 1)
 
 
-STATE_FILE="$HOME/.state"
-
-# Ha nincs állapot, alapértelmezett érték
-if [ ! -f "$STATE_FILE" ]; then
-  echo "FAIL" > "$STATE_FILE"
-fi
-
-# Állapot beolvasása
-STATE=$(cat "$STATE_FILE")
-if [[ "$STATE" == "DOCTOR" ]]; then
-  while IFS= read -r line; do
-    echo "$line"
-  done
-  exit 0
-fi
-
-
-
 ###############################
 ### Part: UX ###
 ###############################
@@ -83,7 +65,7 @@ print_help()
 	printf '%s\n\n' "Install trusted certificate and check SSL handshake against java keystore."
 	# shellcheck disable=SC2059
   printf "Usage: ${BOLD}jssl <operation> [host|file] ${RESET} ...\n"
-	printf '\t%s\n' "<operation>: ping, install, file, list, uninstall, doctor"
+	printf '\t%s\n' "<operation>: ping, install, get, file, list, uninstall, doctor"
 	printf '\t%s\n' "[host|file]: host without https:// and port, eg. example.com or a file containing hosts"
 	printf '\t%s\n' "-p, --port: port (default: '443')"
 	printf '\t%s\n' "-a, --alias: alias in keystore (default: 'jssl_[host]')"
@@ -95,6 +77,7 @@ print_help()
 	printf '%s\n' "${BOLD}Examples:${RESET}"
 	printf '%s\n' "jssl install example.com"
 	printf '%s\n' "jssl ping example.com"
+  printf '%s\n' "jssl get example.com"
 	printf '%s\n\n' "jssl file hosts.txt"
   printf '%s\n\n' "mvn pacakge | jssl doctor"
 
@@ -353,6 +336,30 @@ install_cert()
   rm -f "$_arg_alias".pem
 }
 
+###################
+# Part: install   #
+###################
+get_cert()
+{
+  if [[ "$_arg_alias" == "<host>" ]]; then
+    _arg_alias="jssl_$_arg_host"
+  fi
+
+  debug "${BLUE}Get cert for $JVM_VERSION${RESET}"
+  debug "keytool: ${BLUE}$JAVA_HOME/bin/keytool${RESET}"
+
+  echo | openssl s_client -connect "$_arg_host:$_arg_port" 2>/dev/null | openssl x509 > "$_arg_alias".pem
+  # shellcheck disable=SC2181
+  if [[ $? -ne 0 ]]; then
+    echo "${RED}✖ Failed to fetch certificate from $_arg_host:$_arg_port${RESET}"
+    rm -f "$_arg_alias".pem
+    exit 1
+  fi
+
+  cat "$_arg_alias".pem
+  rm -f "$_arg_alias".pem
+}
+
 run_batch_file() {
   local filename="$1"
 
@@ -441,6 +448,8 @@ assign_positional_args 1 "${_positionals[@]}"
 
 if [ "$_arg_operation" == "ping" ]; then
   check_handshake
+elif [ "$_arg_operation" == "get" ]; then
+  get_cert
 elif [ "$_arg_operation" == "install" ]; then
   install_cert
 elif [ "$_arg_operation" == "uninstall" ]; then
