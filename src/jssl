@@ -394,14 +394,8 @@ list_installed_certs()
   if [ ! -s "$aliases_file" ]; then
     while IFS= read -r line; do
       case "$line" in
-        "Alias name:"*)
-          append_jssl_alias "${line#Alias name: }" "$aliases_file"
-          ;;
         "Alias name: "*)
           append_jssl_alias "${line#Alias name: }" "$aliases_file"
-          ;;
-        "alias name:"*)
-          append_jssl_alias "${line#alias name: }" "$aliases_file"
           ;;
         "alias name: "*)
           append_jssl_alias "${line#alias name: }" "$aliases_file"
@@ -496,14 +490,12 @@ install_cert()
     -keypass "$(storepass)" -storepass "$(storepass)" \
     >/dev/null 2>&1 || true
 
-  "$JAVA_HOME/bin/keytool" -importcert \
+  if "$JAVA_HOME/bin/keytool" -importcert \
     "${keystore_args[@]}" \
     -trustcacerts -noprompt \
     -alias "$alias_name" \
     -file "$cert_file" \
-    -keypass "$(storepass)" -storepass "$(storepass)" > "$keytool_output" 2>&1
-
-  if [[ $? -eq 0 ]]; then
+    -keypass "$(storepass)" -storepass "$(storepass)" > "$keytool_output" 2>&1; then
     if [ "$_verbose" = "true" ]; then
       while IFS= read -r line; do
         debug "$line"
