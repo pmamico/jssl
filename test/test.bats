@@ -18,11 +18,14 @@ setup() {
     if [[ -n "${JSSL_KEYSTORE_PATH:-}" ]]; then
         while IFS= read -r line; do
             alias_name="${line%%,*}"
+            alias_name="${alias_name#"${alias_name%%[![:space:]]*}"}"
+            alias_name="${alias_name%"${alias_name##*[![:space:]]}"}"
+            [[ "$alias_name" == jssl_* ]] || continue
             "$JAVA_HOME/bin/keytool" -delete -noprompt \
                 -keystore "$JSSL_KEYSTORE_PATH" \
                 -storepass "$JSSL_STOREPASS" \
                 -alias "$alias_name" >/dev/null 2>&1 || true
-        done < <("$JAVA_HOME/bin/keytool" -list -keystore "$JSSL_KEYSTORE_PATH" -storepass "$JSSL_STOREPASS" 2>/dev/null | grep '^jssl_')
+        done < <("$JAVA_HOME/bin/keytool" -list -keystore "$JSSL_KEYSTORE_PATH" -storepass "$JSSL_STOREPASS" 2>/dev/null)
     fi
 }
 

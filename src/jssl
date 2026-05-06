@@ -358,6 +358,7 @@ list_installed_certs()
   local expires=""
   local expiry_color=""
   local aliases_file=""
+  local listed_alias=""
   local found="false"
 
   debug "${BLUE}Listing installed jssl certificates in keystore...${RESET}"
@@ -371,9 +372,13 @@ list_installed_certs()
   : > "$aliases_file"
 
   while IFS= read -r line; do
-    case "$line" in
+    listed_alias="${line%%,*}"
+    listed_alias="${listed_alias#"${listed_alias%%[![:space:]]*}"}"
+    listed_alias="${listed_alias%"${listed_alias##*[![:space:]]}"}"
+
+    case "$listed_alias" in
       jssl_*)
-        printf '%s\n' "${line%%,*}" >> "$aliases_file"
+        printf '%s\n' "$listed_alias" >> "$aliases_file"
         ;;
     esac
   done < <("$JAVA_HOME/bin/keytool" -list \
