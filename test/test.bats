@@ -16,6 +16,10 @@ setup() {
     fi
 
     if [[ -n "${JSSL_KEYSTORE_PATH:-}" ]]; then
+        chmod u+w "$JSSL_KEYSTORE_PATH"
+    fi
+
+    if [[ -n "${JSSL_KEYSTORE_PATH:-}" ]]; then
         while IFS= read -r line; do
             alias_name="${line%%,*}"
             alias_name="${alias_name#"${alias_name%%[![:space:]]*}"}"
