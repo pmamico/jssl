@@ -125,6 +125,21 @@ certificate_expiry_color()
   fi
 }
 
+append_jssl_alias()
+{
+  local alias_name="$1"
+  local aliases_file="$2"
+
+  alias_name="${alias_name#"${alias_name%%[![:space:]]*}"}"
+  alias_name="${alias_name%"${alias_name##*[![:space:]]}"}"
+
+  case "$alias_name" in
+    jssl_*)
+      printf '%s\n' "$alias_name" >> "$aliases_file"
+      ;;
+  esac
+}
+
 #################################
 # Part: DEFAULTS INITIALIZATION #
 #################################
@@ -358,7 +373,6 @@ list_installed_certs()
   local expires=""
   local expiry_color=""
   local aliases_file=""
-  local listed_alias=""
   local found="false"
 
   debug "${BLUE}Listing installed jssl certificates in keystore...${RESET}"
@@ -372,18 +386,51 @@ list_installed_certs()
   : > "$aliases_file"
 
   while IFS= read -r line; do
-    listed_alias="${line%%,*}"
-    listed_alias="${listed_alias#"${listed_alias%%[![:space:]]*}"}"
-    listed_alias="${listed_alias%"${listed_alias##*[![:space:]]}"}"
-
-    case "$listed_alias" in
-      jssl_*)
-        printf '%s\n' "$listed_alias" >> "$aliases_file"
-        ;;
-    esac
+    append_jssl_alias "${line%%,*}" "$aliases_file"
   done < <("$JAVA_HOME/bin/keytool" -list \
     "${keystore_args[@]}" \
     -storepass "$(storepass)" 2>/dev/null)
+
+  if [ ! -s "$aliases_file" ]; then
+    while IFS= read -r line; do
+      case "$line" in
+        "Alias name:"*)
+          append_jssl_alias "${line#Alias name: }" "$aliases_file"
+          ;;
+        "Alias name: "*)
+          append_jssl_alias "${line#Alias name: }" "$aliases_file"
+          ;;
+        "alias name:"*)
+          append_jssl_alias "${line#alias name: }" "$aliases_file"
+          ;;
+        "alias name: "*)
+          append_jssl_alias "${line#alias name: }" "$aliases_file"
+          ;;
+      esac
+    done < <("$JAVA_HOME/bin/keytool" -v --list \
+      "${keystore_args[@]}" \
+      -storepass "$(storepass)" 2>/dev/null)
+  fi
+
+  if [ ! -s "$aliases_file" ]; then
+    while IFS= read -r alias_name; do
+      case "$alias_name" in
+        jssl_*)
+          if "$JAVA_HOME/bin/keytool" -list \
+            "${keystore_args[@]}" \
+            -storepass "$(storepass)" \
+            -alias "$alias_name" >/dev/null 2>&1; then
+            append_jssl_alias "$alias_name" "$aliases_file"
+          fi
+          ;;
+      esac
+    done < <(printf '%s\n' "jssl_$_arg_host" "$(resolve_alias)")
+  fi
+
+  if [ -s "$aliases_file" ]; then
+    sort -u "$aliases_file" > "$aliases_file.sorted"
+    mv "$aliases_file.sorted" "$aliases_file"
+  fi
 
   while IFS= read -r alias_name; do
     [ -n "$alias_name" ] || continue
