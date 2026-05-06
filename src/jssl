@@ -472,10 +472,12 @@ install_cert()
 {
   local alias_name
   local cert_file
+  local keytool_output
 
   alias_name=$(resolve_alias)
   create_tmp_dir
   cert_file="$tmp_dir/$alias_name.pem"
+  keytool_output="$tmp_dir/keytool-import.out"
 
   debug "${BLUE}Installing cert for $JVM_VERSION${RESET}"
   debug "keytool: ${BLUE}$JAVA_HOME/bin/keytool${RESET}"
@@ -499,13 +501,21 @@ install_cert()
     -trustcacerts -noprompt \
     -alias "$alias_name" \
     -file "$cert_file" \
-    -keypass "$(storepass)" -storepass "$(storepass)" | debug
+    -keypass "$(storepass)" -storepass "$(storepass)" > "$keytool_output" 2>&1
 
-  # shellcheck disable=SC2181
   if [[ $? -eq 0 ]]; then
+    if [ "$_verbose" = "true" ]; then
+      while IFS= read -r line; do
+        debug "$line"
+      done < "$keytool_output"
+    fi
     echo "${GREEN}✔ Certificate installed successfully${RESET}"
   else
+    while IFS= read -r line; do
+      echo "$line" >&2
+    done < "$keytool_output"
     echo "${RED}✖ Failed to install certificate into Java keystore${RESET}"
+    exit 1
   fi
 }
 
