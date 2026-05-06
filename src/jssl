@@ -357,6 +357,7 @@ list_installed_certs()
   local entry_type=""
   local expires=""
   local expiry_color=""
+  local aliases_file=""
   local found="false"
 
   debug "${BLUE}Listing installed jssl certificates in keystore...${RESET}"
@@ -365,33 +366,47 @@ list_installed_certs()
   printf '%-40s %-20s %-30s %s\n' "Alias" "Created" "Expires" "Type"
   printf '%-40s %-20s %-30s %s\n' "-----" "-------" "-------" "----"
 
+  create_tmp_dir
+  aliases_file="$tmp_dir/list-aliases.txt"
+  : > "$aliases_file"
+
   while IFS= read -r line; do
     case "$line" in
-      "Alias name: jssl"*)
-        alias_name="${line#Alias name: }"
-        creation_date=""
-        entry_type=""
-        expires=""
-        ;;
-      "Creation date:"*)
-        creation_date="${line#Creation date: }"
-        ;;
-      "Entry type:"*)
-        entry_type="${line#Entry type: }"
-        ;;
-      "Valid from:"*)
-        expires="${line##* until: }"
-        if [ -n "$alias_name" ]; then
-          expiry_color=$(certificate_expiry_color "$alias_name")
-          printf '%s%-40s %-20s %-30s %s%s\n' "$expiry_color" "$alias_name" "$creation_date" "$expires" "$entry_type" "$RESET"
-          found="true"
-          alias_name=""
-        fi
+      jssl_*)
+        printf '%s\n' "${line%%,*}" >> "$aliases_file"
         ;;
     esac
-  done < <("$JAVA_HOME/bin/keytool" -v --list \
+  done < <("$JAVA_HOME/bin/keytool" -list \
     "${keystore_args[@]}" \
-    -storepass "$(storepass)")
+    -storepass "$(storepass)" 2>/dev/null)
+
+  while IFS= read -r alias_name; do
+    [ -n "$alias_name" ] || continue
+    creation_date=""
+    entry_type=""
+    expires=""
+
+    while IFS= read -r line; do
+      case "$line" in
+        "Creation date:"*)
+          creation_date="${line#Creation date: }"
+          ;;
+        "Entry type:"*)
+          entry_type="${line#Entry type: }"
+          ;;
+        "Valid from:"*)
+          expires="${line##* until: }"
+          ;;
+      esac
+    done < <("$JAVA_HOME/bin/keytool" -v --list \
+      "${keystore_args[@]}" \
+      -storepass "$(storepass)" \
+      -alias "$alias_name")
+
+    expiry_color=$(certificate_expiry_color "$alias_name")
+    printf '%s%-40s %-20s %-30s %s%s\n' "$expiry_color" "$alias_name" "$creation_date" "$expires" "$entry_type" "$RESET"
+    found="true"
+  done < "$aliases_file"
 
   if [ "$found" = "false" ]; then
     echo "No jssl certificates installed."
