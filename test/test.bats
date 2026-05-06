@@ -48,6 +48,10 @@ setup() {
     assert_output --partial "jssl_example.com"
     assert_output --partial "trustedCertEntry"
 
+    run "$JAVA_HOME/bin/keytool" -list -keystore "$JSSL_KEYSTORE_PATH" -storepass "$JSSL_STOREPASS"
+    assert_success
+    assert_output --partial "jssl_example.com"
+
     run ./src/jssl uninstall example.com
     assert_success
     assert_output --partial "Certificate removed"
