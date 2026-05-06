@@ -1,7 +1,8 @@
 #!/bin/bash
-### jssl v2.2 
-jssl_version="v2.2"
+### jssl v2.3
+jssl_version="v2.3"
 JVM_VERSION=$(java -version 2>&1 | head -n 1)
+tmp_dir=""
 
 
 ###############################
@@ -10,12 +11,13 @@ JVM_VERSION=$(java -version 2>&1 | head -n 1)
 set_colors() {
   if command -v tput &>/dev/null && [ -t 1 ]; then
     RED=$(tput setaf 1)
+    YELLOW=$(tput setaf 3)
     GREEN=$(tput setaf 2)
     BLUE=$(tput setaf 4)
     BOLD=$(tput bold)
     RESET=$(tput sgr0)
   else
-    RED=""; GREEN=""; BLUE=""; BOLD=""; RESET=""
+    RED=""; YELLOW=""; GREEN=""; BLUE=""; BOLD=""; RESET=""
   fi
 }
 set_colors
@@ -45,6 +47,84 @@ debug()
   fi
 }
 
+create_tmp_dir()
+{
+  if [ -z "$tmp_dir" ]; then
+    tmp_dir=$(mktemp -d 2>/dev/null || mktemp -d -t jssl)
+  fi
+}
+
+clean_up_tmp_dir()
+{
+  if [ -n "$tmp_dir" ]; then
+    rm -rf "$tmp_dir"
+  fi
+}
+
+trap clean_up_tmp_dir EXIT
+
+resolve_alias()
+{
+  if [[ "$_arg_alias" == "<host>" ]]; then
+    echo "jssl_$_arg_host"
+  else
+    echo "$_arg_alias"
+  fi
+}
+
+storepass()
+{
+  echo "${JSSL_STOREPASS:-changeit}"
+}
+
+set_keytool_keystore_args()
+{
+  keystore_args=()
+
+  if [ -n "${JSSL_KEYSTORE_PATH:-}" ]; then
+    keystore_args=("-keystore" "$JSSL_KEYSTORE_PATH")
+  elif [[ $JVM_VERSION == *"1.8"* ]]; then
+    keystore_args=("-keystore" "$JAVA_HOME/jre/lib/security/cacerts")
+  else
+    keystore_args=("-cacerts")
+  fi
+}
+
+set_java_truststore_args()
+{
+  truststore_args=()
+
+  if [ -n "${JSSL_KEYSTORE_PATH:-}" ]; then
+    truststore_args=("-Djavax.net.ssl.trustStore=$JSSL_KEYSTORE_PATH" "-Djavax.net.ssl.trustStorePassword=$(storepass)")
+  fi
+}
+
+certificate_expiry_color()
+{
+  local alias_name="$1"
+  local cert_file
+
+  create_tmp_dir
+  cert_file="$tmp_dir/list-cert.pem"
+
+  if ! "$JAVA_HOME/bin/keytool" -exportcert -rfc \
+    "${keystore_args[@]}" \
+    -storepass "$(storepass)" \
+    -alias "$alias_name" \
+    -file "$cert_file" >/dev/null 2>&1; then
+    echo ""
+    return
+  fi
+
+  if ! openssl x509 -checkend 0 -noout -in "$cert_file" >/dev/null 2>&1; then
+    echo "$RED"
+  elif ! openssl x509 -checkend 2592000 -noout -in "$cert_file" >/dev/null 2>&1; then
+    echo "$YELLOW"
+  else
+    echo ""
+  fi
+}
+
 #################################
 # Part: DEFAULTS INITIALIZATION #
 #################################
@@ -64,24 +144,21 @@ print_help()
   printf '%s\n' "${BOLD}jssl $jssl_version${RESET}"
 	printf '%s\n\n' "Install trusted certificate and check SSL handshake against java keystore."
 	# shellcheck disable=SC2059
-  printf "Usage: ${BOLD}jssl <operation> [host|file] ${RESET} ...\n"
+	printf "Usage: ${BOLD}jssl <operation> [host|file] [options]${RESET}\n"
 	printf '\t%s\n' "<operation>: ping, install, get, file, list, uninstall, doctor"
 	printf '\t%s\n' "[host|file]: host without https:// and port, eg. example.com or a file containing hosts"
 	printf '\t%s\n' "-p, --port: port (default: '443')"
 	printf '\t%s\n' "-a, --alias: alias in keystore (default: 'jssl_[host]')"
-	  printf '\t%s\n\n' "-v, --verbose: Prints version"
-  printf '\t%s\n\n' "--version: Prints version"
+	printf '\t%s\n' "-v, --verbose: print debug output"
+	printf '\t%s\n' "--version: print version"
 	printf '\t%s\n' "-h, --help: Prints help"
-
 
 	printf '%s\n' "${BOLD}Examples:${RESET}"
 	printf '%s\n' "jssl install example.com"
 	printf '%s\n' "jssl ping example.com"
-  printf '%s\n' "jssl get example.com"
+	printf '%s\n' "jssl get example.com"
 	printf '%s\n\n' "jssl file hosts.txt"
-  printf '%s\n\n' "mvn pacakge | jssl doctor"
-
-	check_java_home
+	printf '%s\n' "mvn package | jssl doctor"
 }
 
 print_version()
@@ -170,7 +247,8 @@ assign_positional_args()
 
 print_and_compile_java()
 {
-	cat > SSLPing.java <<- EOM
+  create_tmp_dir
+	cat > "$tmp_dir/SSLPing.java" <<- EOM
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
@@ -204,12 +282,7 @@ public class SSLPing {
 	}
 }
 EOM
-	"$JAVA_HOME/bin/javac" SSLPing.java
-}
-
-clean_up_sslping()
-{
-	rm -f SSLPing.java SSLPing.class
+	"$JAVA_HOME/bin/javac" "$tmp_dir/SSLPing.java"
 }
 
 ################
@@ -220,14 +293,14 @@ check_handshake()
   debug "${BLUE}Checking SSL handshake...${RESET}"
   "$JAVA_HOME/bin/javac" -version | debug
   print_and_compile_java
-  "$JAVA_HOME/bin/java" SSLPing "$_arg_host" "$_arg_port"
+  set_java_truststore_args
+  "$JAVA_HOME/bin/java" "${truststore_args[@]}" -cp "$tmp_dir" SSLPing "$_arg_host" "$_arg_port"
   # shellcheck disable=SC2181
   if [[ $? -eq 0 ]]; then
     echo "${GREEN}✔ SSL handshake successful with $_arg_host:${_arg_port}${RESET}"
   else
     echo "${RED}✖ SSL handshake failed with $_arg_host:${_arg_port}${RESET}"
   fi
-  clean_up_sslping
 }
 
 #################
@@ -265,10 +338,11 @@ run_doctor() {
 
   for host in "${unique_hosts[@]}"; do
     echo "${BLUE}➤ Found PKIX error with host: $host${RESET}" >&2
+    self="${BASH_SOURCE[0]}"
     echo "${BLUE}→ Installing cert: jssl install $host${RESET}" >&2
-    jssl install "$host"
+    "$self" install "$host"
     echo "${BLUE}→ Verifying connection: jssl ping $host${RESET}" >&2
-    jssl ping "$host"
+    "$self" ping "$host"
     echo >&2
   done
 }
@@ -278,17 +352,49 @@ run_doctor() {
 ################
 list_installed_certs()
 {
+  local alias_name=""
+  local creation_date=""
+  local entry_type=""
+  local expires=""
+  local expiry_color=""
+  local found="false"
+
   debug "${BLUE}Listing installed jssl certificates in keystore...${RESET}"
-  if [[ $JVM_VERSION == *"1.8"* ]]; then
-    "$JAVA_HOME/bin/keytool" -v --list \
-      -keystore "$JAVA_HOME"/jre/lib/security/cacerts \
-      -storepass changeit \
-      | grep -E "Alias name.*jssl" -A 3
-  else
-    "$JAVA_HOME/bin/keytool" -v --list \
-      -cacerts \
-      -storepass changeit \
-      | grep -E "Alias name.*jssl" -A 3
+  set_keytool_keystore_args
+
+  printf '%-40s %-20s %-30s %s\n' "Alias" "Created" "Expires" "Type"
+  printf '%-40s %-20s %-30s %s\n' "-----" "-------" "-------" "----"
+
+  while IFS= read -r line; do
+    case "$line" in
+      "Alias name: jssl"*)
+        alias_name="${line#Alias name: }"
+        creation_date=""
+        entry_type=""
+        expires=""
+        ;;
+      "Creation date:"*)
+        creation_date="${line#Creation date: }"
+        ;;
+      "Entry type:"*)
+        entry_type="${line#Entry type: }"
+        ;;
+      "Valid from:"*)
+        expires="${line##* until: }"
+        if [ -n "$alias_name" ]; then
+          expiry_color=$(certificate_expiry_color "$alias_name")
+          printf '%s%-40s %-20s %-30s %s%s\n' "$expiry_color" "$alias_name" "$creation_date" "$expires" "$entry_type" "$RESET"
+          found="true"
+          alias_name=""
+        fi
+        ;;
+    esac
+  done < <("$JAVA_HOME/bin/keytool" -v --list \
+    "${keystore_args[@]}" \
+    -storepass "$(storepass)")
+
+  if [ "$found" = "false" ]; then
+    echo "No jssl certificates installed."
   fi
 }
 
@@ -297,34 +403,36 @@ list_installed_certs()
 ###################
 install_cert()
 {
-  if [[ "$_arg_alias" == "<host>" ]]; then
-    _arg_alias="jssl_$_arg_host"
-  fi
+  local alias_name
+  local cert_file
+
+  alias_name=$(resolve_alias)
+  create_tmp_dir
+  cert_file="$tmp_dir/$alias_name.pem"
 
   debug "${BLUE}Installing cert for $JVM_VERSION${RESET}"
   debug "keytool: ${BLUE}$JAVA_HOME/bin/keytool${RESET}"
 
-  echo | openssl s_client -connect "$_arg_host:$_arg_port" 2>/dev/null | openssl x509 > "$_arg_alias".pem
+  echo | openssl s_client -connect "$_arg_host:$_arg_port" 2>/dev/null | openssl x509 > "$cert_file"
   # shellcheck disable=SC2181
   if [[ $? -ne 0 ]]; then
     echo "${RED}✖ Failed to fetch certificate from $_arg_host:$_arg_port${RESET}"
-    rm -f "$_arg_alias".pem
     exit 1
   fi
 
-  if [[ $JVM_VERSION == *"1.8"* ]]; then
-    "$JAVA_HOME/bin/keytool" -import \
-      -trustcacerts -noprompt \
-      -alias "$_arg_alias" \
-      -file "$_arg_alias".pem \
-      -keystore "$JAVA_HOME"/jre/lib/security/cacerts \
-      -keypass changeit -storepass changeit | debug
-  else
-    "$JAVA_HOME/bin/keytool" -importcert -cacerts -noprompt \
-      -alias "$_arg_alias" \
-      -file "$_arg_alias".pem \
-      -keypass changeit -storepass changeit | debug
-  fi
+  set_keytool_keystore_args
+  "$JAVA_HOME/bin/keytool" -delete -noprompt \
+    "${keystore_args[@]}" \
+    -alias "$alias_name" \
+    -keypass "$(storepass)" -storepass "$(storepass)" \
+    >/dev/null 2>&1 || true
+
+  "$JAVA_HOME/bin/keytool" -importcert \
+    "${keystore_args[@]}" \
+    -trustcacerts -noprompt \
+    -alias "$alias_name" \
+    -file "$cert_file" \
+    -keypass "$(storepass)" -storepass "$(storepass)" | debug
 
   # shellcheck disable=SC2181
   if [[ $? -eq 0 ]]; then
@@ -332,8 +440,6 @@ install_cert()
   else
     echo "${RED}✖ Failed to install certificate into Java keystore${RESET}"
   fi
-
-  rm -f "$_arg_alias".pem
 }
 
 ###################
@@ -341,23 +447,24 @@ install_cert()
 ###################
 get_cert()
 {
-  if [[ "$_arg_alias" == "<host>" ]]; then
-    _arg_alias="jssl_$_arg_host"
-  fi
+  local alias_name
+  local cert_file
+
+  alias_name=$(resolve_alias)
+  create_tmp_dir
+  cert_file="$tmp_dir/$alias_name.pem"
 
   debug "${BLUE}Get cert for $JVM_VERSION${RESET}"
   debug "keytool: ${BLUE}$JAVA_HOME/bin/keytool${RESET}"
 
-  echo | openssl s_client -connect "$_arg_host:$_arg_port" 2>/dev/null | openssl x509 > "$_arg_alias".pem
+  echo | openssl s_client -connect "$_arg_host:$_arg_port" 2>/dev/null | openssl x509 > "$cert_file"
   # shellcheck disable=SC2181
   if [[ $? -ne 0 ]]; then
     echo "${RED}✖ Failed to fetch certificate from $_arg_host:$_arg_port${RESET}"
-    rm -f "$_arg_alias".pem
     exit 1
   fi
 
-  cat "$_arg_alias".pem
-  rm -f "$_arg_alias".pem
+  cat "$cert_file"
 }
 
 run_batch_file() {
@@ -415,28 +522,20 @@ check_java_home() {
 ###################
 uninstall_cert()
 {
-  if [[ "$_arg_alias" == "<host>" ]]; then
-    _arg_alias="$_arg_host"
-  fi
+  local alias_name
 
-  debug "${BLUE}Uninstalling certificate: jssl_$_arg_alias${RESET}"
+  alias_name=$(resolve_alias)
+
+  debug "${BLUE}Uninstalling certificate: $alias_name${RESET}"
   debug "keytool: ${BLUE}$JAVA_HOME/bin/keytool${RESET}"
 
-  if [[ $JVM_VERSION == *"1.8"* ]]; then
-    "$JAVA_HOME/bin/keytool" -delete \
-      -noprompt -trustcacerts \
-      -alias "jssl_$_arg_alias" \
-      -keystore "$JAVA_HOME"/jre/lib/security/cacerts \
-      -keypass changeit -storepass changeit \
-      && echo "${GREEN}✔ Certificate removed from Java keystore${RESET}" \
-      || echo "${RED}✖ Failed to remove certificate${RESET}"
-  else
-    "$JAVA_HOME/bin/keytool" -delete -noprompt -cacerts \
-      -alias "jssl_$_arg_alias" \
-      -keypass changeit -storepass changeit \
-      && echo "${GREEN}✔ Certificate removed from Java keystore${RESET}" \
-      || echo "${RED}✖ Failed to remove certificate${RESET}"
-  fi
+  set_keytool_keystore_args
+  "$JAVA_HOME/bin/keytool" -delete -noprompt \
+    "${keystore_args[@]}" \
+    -alias "$alias_name" \
+    -keypass "$(storepass)" -storepass "$(storepass)" \
+    && echo "${GREEN}✔ Certificate removed from Java keystore${RESET}" \
+    || echo "${RED}✖ Failed to remove certificate${RESET}"
 }
 
 ################################################
