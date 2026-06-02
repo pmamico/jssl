@@ -77,6 +77,39 @@ storepass()
   echo "${JSSL_STOREPASS:-changeit}"
 }
 
+resolve_keystore_path()
+{
+  if [ -n "${JSSL_KEYSTORE_PATH:-}" ]; then
+    echo "$JSSL_KEYSTORE_PATH"
+  elif [[ $JVM_VERSION == *"1.8"* ]]; then
+    echo "$JAVA_HOME/jre/lib/security/cacerts"
+  else
+    echo "$JAVA_HOME/lib/security/cacerts"
+  fi
+}
+
+ensure_keystore_writable()
+{
+  local keystore_path
+  local keystore_dir
+
+  keystore_path=$(resolve_keystore_path)
+  keystore_dir=$(dirname "$keystore_path")
+
+  if { [ -e "$keystore_path" ] && [ -w "$keystore_path" ]; } || { [ ! -e "$keystore_path" ] && [ -d "$keystore_dir" ] && [ -w "$keystore_dir" ]; }; then
+    return
+  fi
+
+  if [ -n "${JSSL_KEYSTORE_PATH:-}" ]; then
+    echo "${RED}✖ Keystore is not writable: $keystore_path${RESET}" >&2
+    echo "Set JSSL_KEYSTORE_PATH to a writable keystore file or adjust its permissions.${RESET}" >&2
+  else
+    echo "${RED}✖ Java keystore is not writable: $keystore_path${RESET}" >&2
+    echo "Re-run with elevated permissions or set JSSL_KEYSTORE_PATH to a writable keystore copy.${RESET}" >&2
+  fi
+  exit 1
+}
+
 set_keytool_keystore_args()
 {
   keystore_args=()
@@ -483,6 +516,7 @@ install_cert()
     exit 1
   fi
 
+  ensure_keystore_writable
   set_keytool_keystore_args
   "$JAVA_HOME/bin/keytool" -delete -noprompt \
     "${keystore_args[@]}" \
@@ -598,6 +632,7 @@ uninstall_cert()
   debug "${BLUE}Uninstalling certificate: $alias_name${RESET}"
   debug "keytool: ${BLUE}$JAVA_HOME/bin/keytool${RESET}"
 
+  ensure_keystore_writable
   set_keytool_keystore_args
   "$JAVA_HOME/bin/keytool" -delete -noprompt \
     "${keystore_args[@]}" \

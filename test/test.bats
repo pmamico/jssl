@@ -103,6 +103,14 @@ setup() {
     refute_output --partial "jssl_custom_example"
 }
 
+@test "jssl fails early when keystore is not writable" {
+    chmod u-w "$JSSL_KEYSTORE_PATH"
+
+    run ./src/jssl install example.com
+    assert_failure
+    assert_output --partial "Keystore is not writable"
+}
+
 @test "jssl rejects unknown operation" {
     run ./src/jssl unknown example.com
     assert_failure
