@@ -111,6 +111,18 @@ setup() {
     assert_output --partial "Keystore is not writable"
 }
 
+@test "jssl install works without JAVA_HOME when java is on PATH" {
+    runtime_java_home=$(java -XshowSettings:properties -version 2>&1 | awk -F'= ' '/^[[:space:]]*java.home = / {print $2; exit}')
+    export JSSL_KEYSTORE_PATH="$BATS_TEST_TMPDIR/cacerts.no-java-home"
+    cp "$runtime_java_home/lib/security/cacerts" "$JSSL_KEYSTORE_PATH"
+    chmod u+w "$JSSL_KEYSTORE_PATH"
+    unset JAVA_HOME
+
+    run ./src/jssl install example.com
+    assert_success
+    assert_output --partial "Certificate installed"
+}
+
 @test "jssl rejects unknown operation" {
     run ./src/jssl unknown example.com
     assert_failure

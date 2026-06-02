@@ -1,8 +1,29 @@
 #!/bin/bash
 ### jssl v2.3
 jssl_version="v2.3"
-JVM_VERSION=$(java -version 2>&1 | head -n 1)
 tmp_dir=""
+
+resolve_java_home()
+{
+  if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ]; then
+    echo "$JAVA_HOME"
+    return 0
+  fi
+
+  if [ "$(uname -s)" = "Darwin" ] && [ -x "/usr/libexec/java_home" ]; then
+    /usr/libexec/java_home 2>/dev/null && return 0
+  fi
+
+  java -XshowSettings:properties -version 2>&1 | awk -F'= ' '/^[[:space:]]*java.home = / {print $2; exit}'
+}
+
+JAVA_HOME="${JAVA_HOME:-$(resolve_java_home)}"
+
+if [ -n "$JAVA_HOME" ] && [ -x "$JAVA_HOME/bin/java" ]; then
+  JVM_VERSION=$("$JAVA_HOME/bin/java" -version 2>&1 | head -n 1)
+else
+  JVM_VERSION=$(java -version 2>&1 | head -n 1)
+fi
 
 
 ###############################
